@@ -1,6 +1,7 @@
 package sqlancer.mysql;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -20,6 +21,9 @@ public class MySQLOptions implements DBMSSpecificOptions<MySQLOracleFactory> {
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 3306;
 
+    @Parameter(names = "--dbs", description = "DBMSs", variableArity = true)
+    public List<String> DBMSs = new ArrayList<>();
+    
     @Parameter(names = "--oracle")
     public List<MySQLOracleFactory> oracles = Arrays.asList(MySQLOracleFactory.TLP_WHERE);
 
@@ -53,4 +57,8 @@ public class MySQLOptions implements DBMSSpecificOptions<MySQLOracleFactory> {
         return oracles;
     }
 
+    public List<String> getDBMSs() {
+    	return DBMSs;
+    }
+    
 }

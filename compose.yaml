@@ -1,0 +1,41 @@
+services:
+  # sqlancer:
+    # image: mrigger/sqlancer
+    # container_name: sqlancer
+    # network_mode: "host"
+    # command: --timeout-seconds 20 ${DBMS:-sqlite3}
+    # depends_on:
+    #   mysql:
+    #     condition: service_healthy
+    #   postgresql:
+    #     condition: service_healthy
+
+  mysql:
+    image: mysql
+    container_name: mysql
+    # network_mode: "host"
+    ports:
+      - 3306:3306
+    healthcheck: 
+      test: mysql -u root -proot -e " GRANT ALL PRIVILEGES ON *.* TO 'sqlancer'@'%';FLUSH PRIVILEGES;" || exit 1
+      interval: 5s
+      retries: 3
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: sqlancer
+      MYSQL_USER: sqlancer
+
+  postgresql:
+    image: postgres
+    container_name: postgres
+    # network_mode: "host"
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: postgres --help || exit 1
+      interval: 5s
+      retries: 3
+    environment:
+      POSTGRES_PASSWORD: sqlancer 
+      POSTGRES_USER: sqlancer
+      POSTGRES_DB: test

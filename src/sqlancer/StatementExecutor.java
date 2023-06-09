@@ -67,6 +67,7 @@ public class StatementExecutor<G extends GlobalState<?, ?, ?>, A extends Abstrac
                 int nrTries = 0;
                 do {
                     query = nextAction.getQuery(globalState);
+                    System.out.println("q " + nextAction + " " + query.toString());
                     success = globalState.executeStatement(query);
                 } while (nextAction.canBeRetried() && !success
                         && nrTries++ < globalState.getOptions().getNrStatementRetryCount());

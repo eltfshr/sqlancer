@@ -1,6 +1,8 @@
 package sqlancer;
 
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
@@ -12,6 +14,9 @@ public class MainOptions {
     public static final int NO_SET_PORT = -1;
     public static final MainOptions DEFAULT_OPTIONS = new MainOptions();
 
+//    @Parameter(description = "DBMSs")
+//    private List<String> DBMSs = new ArrayList<>();
+    
     @Parameter(names = { "--help", "-h" }, description = "Lists all supported options and commands", help = true)
     private boolean help; // NOPMD
 
@@ -285,4 +290,8 @@ public class MainOptions {
     public boolean useReducer() {
         return useReducer;
     }
+    
+//    public List<String> getDBMSs() {
+//    	return DBMSs;
+//    }
 }

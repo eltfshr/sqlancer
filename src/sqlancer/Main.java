@@ -50,6 +50,8 @@ import sqlancer.timescaledb.TimescaleDBProvider;
 import sqlancer.yugabyte.ycql.YCQLProvider;
 import sqlancer.yugabyte.ysql.YSQLProvider;
 
+import sqlancer.mysql.MySQLOptions;
+
 public final class Main {
 
     public static final File LOG_DIRECTORY = new File("logs");
@@ -493,7 +495,8 @@ public final class Main {
             jc.usage();
             return options.getErrorExitCode();
         }
-
+        System.out.println(jc.getParsedCommand());
+        System.out.println();
         Randomly.initialize(options);
         if (options.printProgressInformation()) {
             startProgressMonitor();
@@ -522,99 +525,110 @@ public final class Main {
                 }));
             }
         }
-
+//
         ExecutorService execService = Executors.newFixedThreadPool(options.getNumberConcurrentThreads());
-        DBMSExecutorFactory<?, ?, ?> executorFactory = nameToProvider.get(jc.getParsedCommand());
-
-        if (options.performConnectionTest()) {
-            try {
-                executorFactory.getDBMSExecutor(options.getDatabasePrefix() + "connectiontest", new Randomly())
-                        .testConnection();
-            } catch (Exception e) {
-                System.err.println(
-                        "SQLancer failed creating a test database, indicating that SQLancer might have failed connecting to the DBMS. In order to change the username, password, host and port, you can use the --username, --password, --host and --port options.\n\n");
-                e.printStackTrace();
-                return options.getErrorExitCode();
-            }
-        }
-        final AtomicBoolean someOneFails = new AtomicBoolean(false);
-
-        for (int i = 0; i < options.getTotalNumberTries(); i++) {
-            final String databaseName = options.getDatabasePrefix() + i;
-            final long seed;
-            if (options.getRandomSeed() == -1) {
-                seed = System.currentTimeMillis() + i;
-            } else {
-                seed = options.getRandomSeed() + i;
-            }
-            execService.execute(new Runnable() {
-
-                @Override
-                public void run() {
-                    Thread.currentThread().setName(databaseName);
-                    runThread(databaseName);
-                }
-
-                private void runThread(final String databaseName) {
-                    Randomly r = new Randomly(seed);
-                    try {
-                        int maxNrDbs = options.getMaxGeneratedDatabases();
-                        // run without a limit if maxNrDbs == -1
-                        for (int i = 0; i < maxNrDbs || maxNrDbs == -1; i++) {
-                            Boolean continueRunning = run(options, execService, executorFactory, r, databaseName);
-                            if (!continueRunning) {
-                                someOneFails.set(true);
-                                break;
-                            }
-                        }
-                    } finally {
-                        threadsShutdown.addAndGet(1);
-                        if (threadsShutdown.get() == options.getTotalNumberTries()) {
-                            execService.shutdown();
-                        }
-                    }
-                }
-
-                private boolean run(MainOptions options, ExecutorService execService,
-                        DBMSExecutorFactory<?, ?, ?> executorFactory, Randomly r, final String databaseName) {
-                    DBMSExecutor<?, ?, ?> executor = executorFactory.getDBMSExecutor(databaseName, r);
-                    try {
-                        executor.run();
-                        return true;
-                    } catch (IgnoreMeException e) {
-                        return true;
-                    } catch (Throwable reduce) {
-                        reduce.printStackTrace();
-                        executor.getStateToReproduce().exception = reduce.getMessage();
-                        executor.getLogger().logFileWriter = null;
-                        executor.getLogger().logException(reduce, executor.getStateToReproduce());
-                        return false;
-                    } finally {
-                        try {
-                            if (options.logEachSelect()) {
-                                if (executor.getLogger().currentFileWriter != null) {
-                                    executor.getLogger().currentFileWriter.close();
-                                }
-                                executor.getLogger().currentFileWriter = null;
-                            }
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            });
+        DBMSExecutorFactory<?, ?, ?> executorFactory1 = nameToProvider.get(jc.getParsedCommand());
+        
+//        System.out.println(((MySQLOptions)executorFactory1.getCommand()).oracles);
+        List<String> DBMSs = ((MySQLOptions)executorFactory1.getCommand()).getDBMSs();
+        System.out.println(DBMSs);
+        JCommander jc2 = commandBuilder.build();
+        for (String DBMS : DBMSs) {
+        	jc2.parse(DBMS);
+        	System.out.println(jc2.getParsedCommand());
+        	DBMSExecutorFactory<?, ?, ?> executorFactory = nameToProvider.get(jc2.getParsedCommand());
+        	
+        	if (options.performConnectionTest()) {
+        		try {
+        			executorFactory.getDBMSExecutor(options.getDatabasePrefix() + "connectiontest", new Randomly())
+        			.testConnection();
+        		} catch (Exception e) {
+        			System.err.println(
+        					"SQLancer failed creating a test database, indicating that SQLancer might have failed connecting to the DBMS. In order to change the username, password, host and port, you can use the --username, --password, --host and --port options.\n\n");
+        			e.printStackTrace();
+        			return options.getErrorExitCode();
+        		}
+        	}
+        	final AtomicBoolean someOneFails = new AtomicBoolean(false);
+        	
+        	for (int i = 0; i < options.getTotalNumberTries(); i++) {
+        		final String databaseName = options.getDatabasePrefix() + i;
+        		final long seed;
+        		if (options.getRandomSeed() == -1) {
+        			seed = System.currentTimeMillis() + i;
+        		} else {
+        			seed = options.getRandomSeed() + i;
+        		}
+        		execService.execute(new Runnable() {
+        			
+        			@Override
+        			public void run() {
+        				Thread.currentThread().setName(databaseName);
+        				runThread(databaseName);
+        			}
+        			
+        			private void runThread(final String databaseName) {
+        				Randomly r = new Randomly(seed);
+        				try {
+        					int maxNrDbs = options.getMaxGeneratedDatabases();
+        					// run without a limit if maxNrDbs == -1
+        					for (int i = 0; i < maxNrDbs || maxNrDbs == -1; i++) {
+        						Boolean continueRunning = run(options, execService, executorFactory, r, databaseName);
+        						if (!continueRunning) {
+        							someOneFails.set(true);
+        							break;
+        						}
+        					}
+        				} finally {
+        					threadsShutdown.addAndGet(1);
+        					if (threadsShutdown.get() == options.getTotalNumberTries()) {
+        						execService.shutdown();
+        					}
+        				}
+        			}
+        			
+        			private boolean run(MainOptions options, ExecutorService execService,
+        					DBMSExecutorFactory<?, ?, ?> executorFactory, Randomly r, final String databaseName) {
+        				DBMSExecutor<?, ?, ?> executor = executorFactory.getDBMSExecutor(databaseName, r);
+        				try {
+        					executor.run();
+        					return true;
+        				} catch (IgnoreMeException e) {
+        					return true;
+        				} catch (Throwable reduce) {
+        					reduce.printStackTrace();
+        					executor.getStateToReproduce().exception = reduce.getMessage();
+        					executor.getLogger().logFileWriter = null;
+        					executor.getLogger().logException(reduce, executor.getStateToReproduce());
+        					return false;
+        				} finally {
+        					try {
+        						if (options.logEachSelect()) {
+        							if (executor.getLogger().currentFileWriter != null) {
+        								executor.getLogger().currentFileWriter.close();
+        							}
+        							executor.getLogger().currentFileWriter = null;
+        						}
+        					} catch (IOException e) {
+        						e.printStackTrace();
+        					}
+        				}
+        			}
+        		});
+        	}
         }
         try {
-            if (options.getTimeoutSeconds() == -1) {
-                execService.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-            } else {
-                execService.awaitTermination(options.getTimeoutSeconds(), TimeUnit.SECONDS);
-            }
+        	if (options.getTimeoutSeconds() == -1) {
+        		execService.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+        	} else {
+        		execService.awaitTermination(options.getTimeoutSeconds(), TimeUnit.SECONDS);
+        	}
         } catch (InterruptedException e) {
-            e.printStackTrace();
+        	e.printStackTrace();
         }
-
-        return someOneFails.get() ? options.getErrorExitCode() : 0;
+        
+//        return someOneFails.get() ? options.getErrorExitCode() : 0;
+        return 0;
     }
 
     /**

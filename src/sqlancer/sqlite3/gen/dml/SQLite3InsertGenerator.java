@@ -53,12 +53,12 @@ public class SQLite3InsertGenerator {
         SQLite3Errors.addExpectedExpressionErrors(errors);
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT ");
-        if (Randomly.getBoolean()) {
-            sb.append("OR IGNORE "); // TODO: try to generate REPLACE
-        } else {
-            String fromOptions = Randomly.fromOptions("OR REPLACE ", "OR ABORT ", "OR FAIL ", "OR ROLLBACK ");
-            sb.append(fromOptions);
-        }
+        // if (Randomly.getBoolean()) {
+        //     sb.append("OR IGNORE "); // TODO: try to generate REPLACE
+        // } else {
+        //     String fromOptions = Randomly.fromOptions("OR REPLACE ", "OR ABORT ", "OR FAIL ", "OR ROLLBACK ");
+        //     sb.append(fromOptions);
+        // }
         boolean defaultValues = false;
         sb.append("INTO ");
         sb.append(table.getName());
@@ -75,50 +75,53 @@ public class SQLite3InsertGenerator {
             assert cols.size() == table.getColumns().size();
         }
         sb.append(" VALUES ");
-        int nrRows = 1 + Randomly.smallNumber();
-        appendNrValues(sb, cols, nrRows);
-        boolean columnsInConflictClause = Randomly.getBoolean();
-        if (!defaultValues && Randomly.getBooleanWithSmallProbability() && !table.isVirtual()) {
-            sb.append(" ON CONFLICT");
-            if (columnsInConflictClause) {
-                sb.append("(");
-                sb.append(table.getRandomNonEmptyColumnSubset().stream().map(c -> c.getName())
-                        .collect(Collectors.joining(", ")));
-                sb.append(")");
-                errors.add("ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint");
-            }
-            sb.append(" DO ");
-            if (Randomly.getBoolean() || !columnsInConflictClause) {
-                sb.append("NOTHING");
-            } else {
-                sb.append("UPDATE SET ");
-                List<SQLite3Column> columns = table.getRandomNonEmptyColumnSubset();
-                for (int i = 0; i < columns.size(); i++) {
-                    if (i != 0) {
-                        sb.append(", ");
-                    }
-                    sb.append(columns.get(i).getName());
-                    sb.append("=");
-                    if (Randomly.getBoolean()) {
-                        sb.append(
-                                SQLite3Visitor.asString(SQLite3ExpressionGenerator.getRandomLiteralValue(globalState)));
-                    } else {
-                        if (Randomly.getBoolean()) {
-                            sb.append("excluded.");
-                        }
-                        sb.append(table.getRandomColumn().getName());
-                    }
+        sb.append("(");
+        sb.append(SQLite3Visitor.asString(SQLite3ExpressionGenerator.getRandomLiteralValue(globalState)));
+        sb.append(")");
+        // int nrRows = 1 + Randomly.smallNumber();
+        // appendNrValues(sb, cols, nrRows);
+        // boolean columnsInConflictClause = Randomly.getBoolean();
+        // if (!defaultValues && Randomly.getBooleanWithSmallProbability() && !table.isVirtual()) {
+        //     sb.append(" ON CONFLICT");
+        //     if (columnsInConflictClause) {
+        //         sb.append("(");
+        //         sb.append(table.getRandomNonEmptyColumnSubset().stream().map(c -> c.getName())
+        //                 .collect(Collectors.joining(", ")));
+        //         sb.append(")");
+        //         errors.add("ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint");
+        //     }
+        //     sb.append(" DO ");
+        //     if (Randomly.getBoolean() || !columnsInConflictClause) {
+        //         sb.append("NOTHING");
+        //     } else {
+        //         sb.append("UPDATE SET ");
+        //         List<SQLite3Column> columns = table.getRandomNonEmptyColumnSubset();
+        //         for (int i = 0; i < columns.size(); i++) {
+        //             if (i != 0) {
+        //                 sb.append(", ");
+        //             }
+        //             sb.append(columns.get(i).getName());
+        //             sb.append("=");
+        //             if (Randomly.getBoolean()) {
+        //                 sb.append(
+        //                         SQLite3Visitor.asString(SQLite3ExpressionGenerator.getRandomLiteralValue(globalState)));
+        //             } else {
+        //                 if (Randomly.getBoolean()) {
+        //                     sb.append("excluded.");
+        //                 }
+        //                 sb.append(table.getRandomColumn().getName());
+        //             }
 
-                }
-                errors.add("Abort due to constraint violation");
-                errors.add("Data type mismatch (datatype mismatch)");
-                if (Randomly.getBoolean()) {
-                    sb.append(" WHERE ");
-                    sb.append(SQLite3Visitor.asString(new SQLite3ExpressionGenerator(globalState)
-                            .setColumns(table.getColumns()).generateExpression()));
-                }
-            }
-        }
+        //         }
+        //         errors.add("Abort due to constraint violation");
+        //         errors.add("Data type mismatch (datatype mismatch)");
+        //         if (Randomly.getBoolean()) {
+        //             sb.append(" WHERE ");
+        //             sb.append(SQLite3Visitor.asString(new SQLite3ExpressionGenerator(globalState)
+        //                     .setColumns(table.getColumns()).generateExpression()));
+        //         }
+        //     }
+        // }
         return sb.toString();
     }
 

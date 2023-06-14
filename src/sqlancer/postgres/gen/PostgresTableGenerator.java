@@ -80,12 +80,12 @@ public class PostgresTableGenerator {
         }
         sb.append(" ");
         sb.append(tableName);
-        System.out.println("sb " + sb.toString());
         if (Randomly.getBoolean() && !newSchema.getDatabaseTables().isEmpty()) {
             createLike();
         } else {
             createStandard();
         }
+        System.out.println("sb " + sb.toString());
         return new SQLQueryAdapter(sb.toString(), errors, true);
     }
 

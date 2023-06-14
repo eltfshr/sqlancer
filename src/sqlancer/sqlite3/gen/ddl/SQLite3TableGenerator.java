@@ -70,76 +70,78 @@ public class SQLite3TableGenerator {
     }
 
     public void start() {
-        sb.append("CREATE ");
-        if (globalState.getDbmsSpecificOptions().testTempTables && Randomly.getBoolean()) {
-            tempTable = true;
-            if (Randomly.getBoolean()) {
-                sb.append("TEMP ");
-            } else {
-                sb.append("TEMPORARY ");
-            }
-        }
-        sb.append("TABLE ");
-        if (Randomly.getBoolean()) {
-            sb.append("IF NOT EXISTS ");
-        }
-        sb.append(tableName);
-        sb.append(" (");
-        boolean allowPrimaryKeyInColumn = Randomly.getBoolean();
-        int nrColumns = 1 + Randomly.smallNumber();
-        for (int i = 0; i < nrColumns; i++) {
-            columns.add(SQLite3Column.createDummy(DBMSCommon.createColumnName(i)));
-        }
-        for (int i = 0; i < nrColumns; i++) {
-            if (i != 0) {
-                sb.append(", ");
-            }
-            String columnName = DBMSCommon.createColumnName(columnId);
-            SQLite3ColumnBuilder columnBuilder = new SQLite3ColumnBuilder()
-                    .allowPrimaryKey(allowPrimaryKeyInColumn && !containsPrimaryKey);
-            sb.append(columnBuilder.createColumn(columnName, globalState, columns));
-            sb.append(" ");
-            if (columnBuilder.isContainsAutoIncrement()) {
-                this.containsAutoIncrement = true;
-            }
-            if (columnBuilder.isContainsPrimaryKey()) {
-                this.containsPrimaryKey = true;
-            }
+        // sb.append("CREATE ");
+        // if (globalState.getDbmsSpecificOptions().testTempTables && Randomly.getBoolean()) {
+        //     tempTable = true;
+        //     if (Randomly.getBoolean()) {
+        //         sb.append("TEMP ");
+        //     } else {
+        //         sb.append("TEMPORARY ");
+        //     }
+        // }
+        // sb.append("TABLE ");
+        // if (Randomly.getBoolean()) {
+        //     sb.append("IF NOT EXISTS ");
+        // }
+        // sb.append(tableName);
+        // sb.append(" (");
+        // boolean allowPrimaryKeyInColumn = Randomly.getBoolean();
+        // int nrColumns = 1 + Randomly.smallNumber();
+        // for (int i = 0; i < nrColumns; i++) {
+        //     columns.add(SQLite3Column.createDummy(DBMSCommon.createColumnName(i)));
+        // }
+        // for (int i = 0; i < nrColumns; i++) {
+        //     if (i != 0) {
+        //         sb.append(", ");
+        //     }
+        //     String columnName = DBMSCommon.createColumnName(columnId);
+        //     SQLite3ColumnBuilder columnBuilder = new SQLite3ColumnBuilder()
+        //             .allowPrimaryKey(allowPrimaryKeyInColumn && !containsPrimaryKey);
+        //     sb.append(columnBuilder.createColumn(columnName, globalState, columns));
+        //     sb.append(" ");
+        //     if (columnBuilder.isContainsAutoIncrement()) {
+        //         this.containsAutoIncrement = true;
+        //     }
+        //     if (columnBuilder.isContainsPrimaryKey()) {
+        //         this.containsPrimaryKey = true;
+        //     }
 
-            columnNames.add(columnName);
-            columnId++;
-        }
-        if (!containsPrimaryKey && Randomly.getBooleanWithSmallProbability()) {
-            addColumnConstraints("PRIMARY KEY");
-            containsPrimaryKey = true;
-        }
-        if (Randomly.getBooleanWithSmallProbability()) {
-            for (int i = 0; i < Randomly.smallNumber(); i++) {
-                addColumnConstraints("UNIQUE");
-            }
-        }
+        //     columnNames.add(columnName);
+        //     columnId++;
+        // }
+        // if (!containsPrimaryKey && Randomly.getBooleanWithSmallProbability()) {
+        //     addColumnConstraints("PRIMARY KEY");
+        //     containsPrimaryKey = true;
+        // }
+        // if (Randomly.getBooleanWithSmallProbability()) {
+        //     for (int i = 0; i < Randomly.smallNumber(); i++) {
+        //         addColumnConstraints("UNIQUE");
+        //     }
+        // }
 
-        if (globalState.getDbmsSpecificOptions().testForeignKeys && Randomly.getBooleanWithSmallProbability()) {
-            addForeignKey();
-        }
+        // if (globalState.getDbmsSpecificOptions().testForeignKeys && Randomly.getBooleanWithSmallProbability()) {
+        //     addForeignKey();
+        // }
 
-        if (globalState.getDbmsSpecificOptions().testCheckConstraints && globalState
-                .getDbmsSpecificOptions().oracles != SQLite3OracleFactory.PQS /*
-                                                                               * we are currently lacking a parser to
-                                                                               * read column definitions, and would
-                                                                               * interpret a COLLATE in the check
-                                                                               * constraint as belonging to the column
-                                                                               */
-                && Randomly.getBooleanWithRatherLowProbability()) {
-            sb.append(SQLite3Common.getCheckConstraint(globalState, columns));
-        }
+        // if (globalState.getDbmsSpecificOptions().testCheckConstraints && globalState
+        //         .getDbmsSpecificOptions().oracles != SQLite3OracleFactory.PQS /*
+        //                                                                        * we are currently lacking a parser to
+        //                                                                        * read column definitions, and would
+        //                                                                        * interpret a COLLATE in the check
+        //                                                                        * constraint as belonging to the column
+        //                                                                        */
+        //         && Randomly.getBooleanWithRatherLowProbability()) {
+        //     sb.append(SQLite3Common.getCheckConstraint(globalState, columns));
+        // }
 
-        sb.append(")");
-        if (globalState.getDbmsSpecificOptions().testWithoutRowids && containsPrimaryKey && !containsAutoIncrement
-                && Randomly.getBoolean()) {
-            // see https://sqlite.org/withoutrowid.html
-            sb.append(" WITHOUT ROWID");
-        }
+        // sb.append(")");
+        // if (globalState.getDbmsSpecificOptions().testWithoutRowids && containsPrimaryKey && !containsAutoIncrement
+        //         && Randomly.getBoolean()) {
+        //     // see https://sqlite.org/withoutrowid.html
+        //     sb.append(" WITHOUT ROWID");
+        // }
+        sb.append("CREATE TABLE IF NOT EXISTS t0 (c0 TEXT)");
+        System.out.println("sb " + sb.toString());
     }
 
     private void addColumnConstraints(String s) {

@@ -11,6 +11,7 @@ import sqlancer.StateToReproduce.OracleRunReproductionState;
 import sqlancer.common.DBMSCommon;
 import sqlancer.common.oracle.CompositeTestOracle;
 import sqlancer.common.oracle.TestOracle;
+import sqlancer.common.query.Query;
 import sqlancer.common.schema.AbstractSchema;
 
 public abstract class ProviderAdapter<G extends GlobalState<O, ? extends AbstractSchema<G, ?>, C>, O extends DBMSSpecificOptions<? extends OracleFactory<G>>, C extends SQLancerDBConnection>
@@ -50,29 +51,29 @@ public abstract class ProviderAdapter<G extends GlobalState<O, ? extends Abstrac
     public Reproducer<G> generateAndTestDatabase(G globalState) throws Exception {
         try {
             generateDatabase(globalState);
-            checkViewsAreValid(globalState);
-            globalState.getManager().incrementCreateDatabase();
+            // checkViewsAreValid(globalState);
+            // globalState.getManager().incrementCreateDatabase();
 
-            TestOracle<G> oracle = getTestOracle(globalState);
-            for (int i = 0; i < globalState.getOptions().getNrQueries(); i++) {
-                try (OracleRunReproductionState localState = globalState.getState().createLocalState()) {
-                    assert localState != null;
-                    try {
-                        oracle.check();
-                        globalState.getManager().incrementSelectQueryCount();
-                    } catch (IgnoreMeException e) {
+            // TestOracle<G> oracle = getTestOracle(globalState);
+            // for (int i = 0; i < globalState.getOptions().getNrQueries(); i++) {
+            //     try (OracleRunReproductionState localState = globalState.getState().createLocalState()) {
+            //         assert localState != null;
+            //         try {
+            //             oracle.check();
+            //             globalState.getManager().incrementSelectQueryCount();
+            //         } catch (IgnoreMeException e) {
 
-                    } catch (AssertionError e) {
-                        Reproducer<G> reproducer = oracle.getLastReproducer();
-                        if (reproducer != null) {
-                            return reproducer;
-                        }
-                        throw e;
-                    }
-                    assert localState != null;
-                    localState.executedWithoutError();
-                }
-            }
+            //         } catch (AssertionError e) {
+            //             Reproducer<G> reproducer = oracle.getLastReproducer();
+            //             if (reproducer != null) {
+            //                 return reproducer;
+            //             }
+            //             throw e;
+            //         }
+            //         assert localState != null;
+            //         localState.executedWithoutError();
+            //     }
+            // }
         } finally {
             globalState.getConnection().close();
         }
@@ -109,6 +110,10 @@ public abstract class ProviderAdapter<G extends GlobalState<O, ? extends Abstrac
     }
 
     public abstract void generateDatabase(G globalState) throws Exception;
+
+    public void generateDatabaseFromExistingState(GlobalState<?, ?, ?> existingGlobalState, G globalState) throws Exception {
+        throw new UnsupportedOperationException();
+    }
 
     // QPG: entry function
     @Override

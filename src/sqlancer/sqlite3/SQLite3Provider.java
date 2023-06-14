@@ -13,6 +13,7 @@ import com.google.auto.service.AutoService;
 
 import sqlancer.AbstractAction;
 import sqlancer.DatabaseProvider;
+import sqlancer.GlobalState;
 import sqlancer.IgnoreMeException;
 import sqlancer.Randomly;
 import sqlancer.SQLConnection;
@@ -20,9 +21,11 @@ import sqlancer.SQLProviderAdapter;
 import sqlancer.StatementExecutor;
 import sqlancer.common.DBMSCommon;
 import sqlancer.common.query.ExpectedErrors;
+import sqlancer.common.query.Query;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLQueryProvider;
 import sqlancer.common.query.SQLancerResultSet;
+import sqlancer.mysql.MySQLGlobalState;
 import sqlancer.sqlite3.SQLite3Options.SQLite3OracleFactory;
 import sqlancer.sqlite3.gen.SQLite3AnalyzeGenerator;
 import sqlancer.sqlite3.gen.SQLite3CreateVirtualRtreeTabelGenerator;
@@ -126,55 +129,55 @@ public class SQLite3Provider extends SQLProviderAdapter<SQLite3GlobalState, SQLi
         int nrPerformed = 0;
         Randomly r = globalState.getRandomly();
         switch (a) {
-        case CREATE_VIEW:
-            nrPerformed = r.getInteger(0, 2);
-            break;
-        case DELETE:
-        case DROP_VIEW:
-        case DROP_INDEX:
-            nrPerformed = r.getInteger(0, 0);
-            break;
-        case ALTER:
-            nrPerformed = r.getInteger(0, 0);
-            break;
-        case EXPLAIN:
-        case CREATE_TRIGGER:
-        case DROP_TABLE:
-            nrPerformed = r.getInteger(0, 0);
-            break;
-        case VACUUM:
-        case CHECK_RTREE_TABLE:
-            nrPerformed = r.getInteger(0, 3);
-            break;
+        // case CREATE_VIEW:
+        //     nrPerformed = r.getInteger(0, 2);
+        //     break;
+        // case DELETE:
+        // case DROP_VIEW:
+        // case DROP_INDEX:
+        //     nrPerformed = r.getInteger(0, 0);
+        //     break;
+        // case ALTER:
+        //     nrPerformed = r.getInteger(0, 0);
+        //     break;
+        // case EXPLAIN:
+        // case CREATE_TRIGGER:
+        // case DROP_TABLE:
+        //     nrPerformed = r.getInteger(0, 0);
+        //     break;
+        // case VACUUM:
+        // case CHECK_RTREE_TABLE:
+        //     nrPerformed = r.getInteger(0, 3);
+        //     break;
         case INSERT:
             nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
             break;
-        case MANIPULATE_STAT_TABLE:
-            nrPerformed = r.getInteger(0, 5);
-            break;
-        case CREATE_INDEX:
-            nrPerformed = r.getInteger(0, 5);
-            break;
-        case VIRTUAL_TABLE_ACTION:
-        case UPDATE:
-            nrPerformed = r.getInteger(0, 30);
-            break;
-        case PRAGMA:
-            nrPerformed = r.getInteger(0, 20);
-            break;
-        case CREATE_TABLE:
-        case CREATE_VIRTUALTABLE:
-        case CREATE_RTREETABLE:
-            nrPerformed = 0;
-            break;
-        case TRANSACTION_START:
-        case REINDEX:
-        case ANALYZE:
-        case ROLLBACK_TRANSACTION:
-        case COMMIT:
-        default:
-            nrPerformed = r.getInteger(1, 10);
-            break;
+        // case MANIPULATE_STAT_TABLE:
+        //     nrPerformed = r.getInteger(0, 5);
+        //     break;
+        // case CREATE_INDEX:
+        //     nrPerformed = r.getInteger(0, 5);
+        //     break;
+        // case VIRTUAL_TABLE_ACTION:
+        // case UPDATE:
+        //     nrPerformed = r.getInteger(0, 30);
+        //     break;
+        // case PRAGMA:
+        //     nrPerformed = r.getInteger(0, 20);
+        //     break;
+        // case CREATE_TABLE:
+        // case CREATE_VIRTUALTABLE:
+        // case CREATE_RTREETABLE:
+        //     nrPerformed = 0;
+        //     break;
+        // case TRANSACTION_START:
+        // case REINDEX:
+        // case ANALYZE:
+        // case ROLLBACK_TRANSACTION:
+        // case COMMIT:
+        // default:
+        //     nrPerformed = r.getInteger(1, 10);
+        //     break;
         }
         return nrPerformed;
     }
@@ -185,14 +188,14 @@ public class SQLite3Provider extends SQLProviderAdapter<SQLite3GlobalState, SQLi
         globalState.setRandomly(r);
         if (globalState.getDbmsSpecificOptions().generateDatabase) {
 
-            addSensiblePragmaDefaults(globalState);
+            // addSensiblePragmaDefaults(globalState);
             int nrTablesToCreate = 1;
-            if (Randomly.getBoolean()) {
-                nrTablesToCreate++;
-            }
-            while (Randomly.getBooleanWithSmallProbability()) {
-                nrTablesToCreate++;
-            }
+            // if (Randomly.getBoolean()) {
+            //     nrTablesToCreate++;
+            // }
+            // while (Randomly.getBooleanWithSmallProbability()) {
+            //     nrTablesToCreate++;
+            // }
             int i = 0;
 
             do {
@@ -214,12 +217,21 @@ public class SQLite3Provider extends SQLProviderAdapter<SQLite3GlobalState, SQLi
                     });
             se.executeStatements();
 
-            SQLQueryAdapter query = SQLite3TransactionGenerator.generateCommit(globalState);
-            globalState.executeStatement(query);
+            // SQLQueryAdapter query = SQLite3TransactionGenerator.generateCommit(globalState);
+            // globalState.executeStatement(query);
 
-            // also do an abort for DEFERRABLE INITIALLY DEFERRED
-            query = SQLite3TransactionGenerator.generateRollbackTransaction(globalState);
-            globalState.executeStatement(query);
+            // // also do an abort for DEFERRABLE INITIALLY DEFERRED
+            // query = SQLite3TransactionGenerator.generateRollbackTransaction(globalState);
+            // globalState.executeStatement(query);
+        }
+    }
+
+    @Override
+    public void generateDatabaseFromExistingState(GlobalState<?, ?, ?> existingGlobalState, SQLite3GlobalState globalState) throws Exception {
+        List<Query<?>> statements = existingGlobalState.getState().getStatements();
+        for (Query<?> statement: statements) {
+            System.out.println(statement.toString());
+            globalState.executeStatement((Query<SQLConnection>)statement);
         }
     }
 

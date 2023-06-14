@@ -187,7 +187,8 @@ public class SQLite3ExpressionGenerator implements ExpressionGenerator<SQLite3Ex
      * https://www.sqlite.org/syntax/literal-value.html
      */
     private SQLite3Expression getRandomLiteralValueInternal(Randomly r) {
-        LiteralValueType randomLiteral = Randomly.fromOptions(LiteralValueType.values());
+        // LiteralValueType randomLiteral = Randomly.fromOptions(LiteralValueType.values());
+        LiteralValueType randomLiteral = LiteralValueType.STRING;
         switch (randomLiteral) {
         case INTEGER:
             if (Randomly.getBoolean()) {

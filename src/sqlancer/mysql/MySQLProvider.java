@@ -4,11 +4,16 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
+
+import org.checkerframework.checker.units.qual.C;
 
 import com.google.auto.service.AutoService;
+import com.mysql.cj.MysqlConnection;
 
 import sqlancer.AbstractAction;
 import sqlancer.DatabaseProvider;
+import sqlancer.GlobalState;
 import sqlancer.IgnoreMeException;
 import sqlancer.MainOptions;
 import sqlancer.Randomly;
@@ -16,6 +21,7 @@ import sqlancer.SQLConnection;
 import sqlancer.SQLProviderAdapter;
 import sqlancer.StatementExecutor;
 import sqlancer.common.DBMSCommon;
+import sqlancer.common.query.Query;
 import sqlancer.common.query.SQLQueryAdapter;
 import sqlancer.common.query.SQLQueryProvider;
 import sqlancer.mysql.gen.MySQLAlterTable;
@@ -79,59 +85,59 @@ public class MySQLProvider extends SQLProviderAdapter<MySQLGlobalState, MySQLOpt
     private static int mapActions(MySQLGlobalState globalState, Action a) {
         Randomly r = globalState.getRandomly();
         int nrPerformed = 0;
-        switch (a) {
-        case DROP_INDEX:
-            nrPerformed = r.getInteger(0, 2);
-            break;
-        case SHOW_TABLES:
-            nrPerformed = r.getInteger(0, 1);
-            break;
-        case CREATE_TABLE:
-            nrPerformed = r.getInteger(0, 1);
-            break;
-        case INSERT:
-            nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
-            break;
-        case REPAIR:
-            nrPerformed = r.getInteger(0, 1);
-            break;
-        case SET_VARIABLE:
-            nrPerformed = r.getInteger(0, 5);
-            break;
-        case CREATE_INDEX:
-            nrPerformed = r.getInteger(0, 5);
-            break;
-        case FLUSH:
-            nrPerformed = Randomly.getBooleanWithSmallProbability() ? r.getInteger(0, 1) : 0;
-            break;
-        case OPTIMIZE:
-            // seems to yield low CPU utilization
-            nrPerformed = Randomly.getBooleanWithSmallProbability() ? r.getInteger(0, 1) : 0;
-            break;
-        case RESET:
-            // affects the global state, so do not execute
-            nrPerformed = globalState.getOptions().getNumberConcurrentThreads() == 1 ? r.getInteger(0, 1) : 0;
-            break;
-        case CHECKSUM:
-        case CHECK_TABLE:
-        case ANALYZE_TABLE:
-            nrPerformed = r.getInteger(0, 2);
-            break;
-        case ALTER_TABLE:
-            nrPerformed = r.getInteger(0, 5);
-            break;
-        case TRUNCATE_TABLE:
-            nrPerformed = r.getInteger(0, 2);
-            break;
-        case SELECT_INFO:
-            nrPerformed = r.getInteger(0, 10);
-            break;
-        case DELETE:
-            nrPerformed = r.getInteger(0, 10);
-            break;
-        default:
-            throw new AssertionError(a);
-        }
+        // switch (a) {
+        // case DROP_INDEX:
+        //     nrPerformed = r.getInteger(0, 2);
+        //     break;
+        // case SHOW_TABLES:
+        //     nrPerformed = r.getInteger(0, 1);
+        //     break;
+        // case CREATE_TABLE:
+        //     nrPerformed = r.getInteger(0, 1);
+        //     break;
+        // case INSERT:
+        //     nrPerformed = r.getInteger(0, globalState.getOptions().getMaxNumberInserts());
+        //     break;
+        // case REPAIR:
+        //     nrPerformed = r.getInteger(0, 1);
+        //     break;
+        // case SET_VARIABLE:
+        //     nrPerformed = r.getInteger(0, 5);
+        //     break;
+        // case CREATE_INDEX:
+        //     nrPerformed = r.getInteger(0, 5);
+        //     break;
+        // case FLUSH:
+        //     nrPerformed = Randomly.getBooleanWithSmallProbability() ? r.getInteger(0, 1) : 0;
+        //     break;
+        // case OPTIMIZE:
+        //     // seems to yield low CPU utilization
+        //     nrPerformed = Randomly.getBooleanWithSmallProbability() ? r.getInteger(0, 1) : 0;
+        //     break;
+        // case RESET:
+        //     // affects the global state, so do not execute
+        //     nrPerformed = globalState.getOptions().getNumberConcurrentThreads() == 1 ? r.getInteger(0, 1) : 0;
+        //     break;
+        // case CHECKSUM:
+        // case CHECK_TABLE:
+        // case ANALYZE_TABLE:
+        //     nrPerformed = r.getInteger(0, 2);
+        //     break;
+        // case ALTER_TABLE:
+        //     nrPerformed = r.getInteger(0, 5);
+        //     break;
+        // case TRUNCATE_TABLE:
+        //     nrPerformed = r.getInteger(0, 2);
+        //     break;
+        // case SELECT_INFO:
+        //     nrPerformed = r.getInteger(0, 10);
+        //     break;
+        // case DELETE:
+        //     nrPerformed = r.getInteger(0, 10);
+        //     break;
+        // default:
+        //     throw new AssertionError(a);
+        // }
         return nrPerformed;
     }
 
@@ -150,6 +156,15 @@ public class MySQLProvider extends SQLProviderAdapter<MySQLGlobalState, MySQLOpt
                     }
                 });
         se.executeStatements();
+    }
+
+    @Override
+    public void generateDatabaseFromExistingState(GlobalState<?, ?, ?> existingGlobalState, MySQLGlobalState globalState) throws Exception {
+        List<Query<?>> statements = existingGlobalState.getState().getStatements();
+        for (Query<?> statement: statements) {
+            System.out.println(statement.toString());
+            globalState.executeStatement((Query<SQLConnection>)statement);
+        }
     }
 
     @Override

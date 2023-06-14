@@ -50,7 +50,7 @@ import sqlancer.timescaledb.TimescaleDBProvider;
 import sqlancer.yugabyte.ycql.YCQLProvider;
 import sqlancer.yugabyte.ysql.YSQLProvider;
 
-import sqlancer.mysql.MySQLOptions;
+import sqlancer.DifferentialTestOptions;
 
 public final class Main {
 
@@ -414,6 +414,45 @@ public final class Main {
             }
         }
 
+        public void run(List<GlobalState<?, ?, ?>> dfGlobalStates) throws Exception {
+            G state = createGlobalState();
+            stateToRepro = provider.getStateToReproduce(databaseName);
+            stateToRepro.seedValue = r.getSeed();
+            state.setState(stateToRepro);
+            logger = new StateLogger(databaseName, provider, options);
+            state.setRandomly(r);
+            state.setDatabaseName(databaseName);
+            state.setMainOptions(options);
+            state.setDbmsSpecificOptions(command);
+            try (C con = provider.createDatabase(state)) {
+                QueryManager<C> manager = new QueryManager<>(state);
+                try {
+                    stateToRepro.databaseVersion = con.getDatabaseVersion();
+                } catch (Exception e) {
+                    // ignore
+                }
+                state.setConnection(con);
+                state.setStateLogger(logger);
+                state.setManager(manager);
+                if (options.logEachSelect()) {
+                    logger.writeCurrent(state.getState());
+                }
+                if (dfGlobalStates.size() == 0) {
+                    provider.generateDatabase(state);
+                } else {
+                    provider.generateDatabaseFromExistingState(dfGlobalStates.get(0), state);
+                }
+                state.updateSchema();
+                try {
+                    logger.getCurrentFileWriter().close();
+                    logger.currentFileWriter = null;
+                } catch (IOException e) {
+                    throw new AssertionError(e);
+                }
+            }
+            dfGlobalStates.add(state);
+        }
+
         private G getInitializedGlobalState(long seed) {
             G state = createGlobalState();
             stateToRepro = provider.getStateToReproduce(databaseName);
@@ -482,6 +521,8 @@ public final class Main {
         Map<String, DBMSExecutorFactory<?, ?, ?>> nameToProvider = new HashMap<>();
         MainOptions options = new MainOptions();
         Builder commandBuilder = JCommander.newBuilder().addObject(options);
+        DifferentialTestOptions dfCommand = new DifferentialTestOptions();
+        commandBuilder.addCommand("df", dfCommand);
         for (DatabaseProvider<?, ?, ?> provider : providers) {
             String name = provider.getDBMSName();
             DBMSExecutorFactory<?, ?, ?> executorFactory = new DBMSExecutorFactory<>(provider, options);
@@ -527,95 +568,187 @@ public final class Main {
         }
 //
         ExecutorService execService = Executors.newFixedThreadPool(options.getNumberConcurrentThreads());
-        DBMSExecutorFactory<?, ?, ?> executorFactory1 = nameToProvider.get(jc.getParsedCommand());
-        
-//        System.out.println(((MySQLOptions)executorFactory1.getCommand()).oracles);
-        List<String> DBMSs = ((MySQLOptions)executorFactory1.getCommand()).getDBMSs();
-        System.out.println(DBMSs);
-        JCommander jc2 = commandBuilder.build();
-        for (String DBMS : DBMSs) {
-        	jc2.parse(DBMS);
-        	System.out.println(jc2.getParsedCommand());
-        	DBMSExecutorFactory<?, ?, ?> executorFactory = nameToProvider.get(jc2.getParsedCommand());
-        	
-        	if (options.performConnectionTest()) {
-        		try {
-        			executorFactory.getDBMSExecutor(options.getDatabasePrefix() + "connectiontest", new Randomly())
-        			.testConnection();
-        		} catch (Exception e) {
-        			System.err.println(
-        					"SQLancer failed creating a test database, indicating that SQLancer might have failed connecting to the DBMS. In order to change the username, password, host and port, you can use the --username, --password, --host and --port options.\n\n");
-        			e.printStackTrace();
-        			return options.getErrorExitCode();
-        		}
-        	}
-        	final AtomicBoolean someOneFails = new AtomicBoolean(false);
-        	
-        	for (int i = 0; i < options.getTotalNumberTries(); i++) {
-        		final String databaseName = options.getDatabasePrefix() + i;
-        		final long seed;
-        		if (options.getRandomSeed() == -1) {
-        			seed = System.currentTimeMillis() + i;
-        		} else {
-        			seed = options.getRandomSeed() + i;
-        		}
-        		execService.execute(new Runnable() {
-        			
-        			@Override
-        			public void run() {
-        				Thread.currentThread().setName(databaseName);
-        				runThread(databaseName);
-        			}
-        			
-        			private void runThread(final String databaseName) {
-        				Randomly r = new Randomly(seed);
-        				try {
-        					int maxNrDbs = options.getMaxGeneratedDatabases();
-        					// run without a limit if maxNrDbs == -1
-        					for (int i = 0; i < maxNrDbs || maxNrDbs == -1; i++) {
-        						Boolean continueRunning = run(options, execService, executorFactory, r, databaseName);
-        						if (!continueRunning) {
-        							someOneFails.set(true);
-        							break;
-        						}
-        					}
-        				} finally {
-        					threadsShutdown.addAndGet(1);
-        					if (threadsShutdown.get() == options.getTotalNumberTries()) {
-        						execService.shutdown();
-        					}
-        				}
-        			}
-        			
-        			private boolean run(MainOptions options, ExecutorService execService,
-        					DBMSExecutorFactory<?, ?, ?> executorFactory, Randomly r, final String databaseName) {
-        				DBMSExecutor<?, ?, ?> executor = executorFactory.getDBMSExecutor(databaseName, r);
-        				try {
-        					executor.run();
-        					return true;
-        				} catch (IgnoreMeException e) {
-        					return true;
-        				} catch (Throwable reduce) {
-        					reduce.printStackTrace();
-        					executor.getStateToReproduce().exception = reduce.getMessage();
-        					executor.getLogger().logFileWriter = null;
-        					executor.getLogger().logException(reduce, executor.getStateToReproduce());
-        					return false;
-        				} finally {
-        					try {
-        						if (options.logEachSelect()) {
-        							if (executor.getLogger().currentFileWriter != null) {
-        								executor.getLogger().currentFileWriter.close();
-        							}
-        							executor.getLogger().currentFileWriter = null;
-        						}
-        					} catch (IOException e) {
-        						e.printStackTrace();
-        					}
-        				}
-        			}
-        		});
-        	}
+        DBMSExecutorFactory<?, ?, ?> executorFactory = nameToProvider.get(jc.getParsedCommand());
+
+        final AtomicBoolean someOneFails = new AtomicBoolean(false);
+
+        if (jc.getParsedCommand() == "df") {
+            // List<String> DBMSs = ((DifferentialTestOptions)executorFactory1.getCommand()).getDBMSs();
+            List<String> DBMSs = dfCommand.getDBMSs();
+            System.out.println(DBMSs);
+            JCommander jc2 = commandBuilder.build();
+            // List<? extends GlobalState<? extends DBMSSpecificOptions<?>, ?, ? extends SQLConnection>> dfGlobalStates = new ArrayList<>();
+            List<GlobalState<?, ?, ?>> dfGlobalStates = new ArrayList<>();
+            List<DBMSExecutorFactory<?, ?, ?>> dfExecutorFactories = new ArrayList<>();
+            for (String DBMS : DBMSs) {
+            	jc2.parse(DBMS);
+                // System.out.println(jc2.getParsedCommand());
+                DBMSExecutorFactory<?, ?, ?> dfExecutorFactory = nameToProvider.get(jc.getParsedCommand());
+                dfExecutorFactories.add(dfExecutorFactory);
+                if (options.performConnectionTest()) {
+                    try {
+                        dfExecutorFactory.getDBMSExecutor(options.getDatabasePrefix() + "connectiontest", new Randomly())
+                        .testConnection();
+                    } catch (Exception e) {
+                        System.err.println(
+                                "SQLancer failed creating a test database, indicating that SQLancer might have failed connecting to the DBMS. In order to change the username, password, host and port, you can use the --username, --password, --host and --port options.\n\n");
+                        e.printStackTrace();
+                        return options.getErrorExitCode();
+                    }
+                }
+            }
+            final String databaseName = options.getDatabasePrefix() + 0;
+            final long seed;
+            if (options.getRandomSeed() == -1) {
+                seed = System.currentTimeMillis();
+            } else {
+                seed = options.getRandomSeed();
+            }
+            execService.execute(new Runnable() {
+                
+                @Override
+                public void run() {
+                    Thread.currentThread().setName(databaseName);
+                    runThread(databaseName);
+                }
+                
+                private void runThread(final String databaseName) {
+                    Randomly r = new Randomly(seed);
+                    try {
+                        int maxNrDbs = options.getMaxGeneratedDatabases();
+                        // run without a limit if maxNrDbs == -1
+                        for (int i = 0; i < maxNrDbs || maxNrDbs == -1; i++) {
+                            Boolean continueRunning = true;
+                            for (DBMSExecutorFactory<?, ?, ?> dfExecutorFactory: dfExecutorFactories) {
+                                continueRunning = run(options, execService, dfExecutorFactory, r, databaseName);
+                                if (!continueRunning) {
+                                    someOneFails.set(true);
+                                    break;
+                                }
+                            }
+
+                            if (!continueRunning) {
+                                break;
+                            }
+                            
+                            //test here
+
+                        }
+                    } finally {
+                        threadsShutdown.addAndGet(1);
+                        if (threadsShutdown.get() == options.getTotalNumberTries()) {
+                            execService.shutdown();
+                        }
+                    }
+                }
+                
+                private boolean run(MainOptions options, ExecutorService execService,
+                        DBMSExecutorFactory<?, ?, ?> dfExecutorFactory, Randomly r, final String databaseName) {  
+                    DBMSExecutor<?, ?, ?> executor = dfExecutorFactory.getDBMSExecutor(databaseName, r);
+                    try {
+                        executor.run(dfGlobalStates);
+                        return true;
+                    } catch (IgnoreMeException e) {
+                        return true;
+                    } catch (Throwable reduce) {
+                        reduce.printStackTrace();
+                        executor.getStateToReproduce().exception = reduce.getMessage();
+                        executor.getLogger().logFileWriter = null;
+                        executor.getLogger().logException(reduce, executor.getStateToReproduce());
+                        return false;
+                    } finally {
+                        try {
+                            if (options.logEachSelect()) {
+                                if (executor.getLogger().currentFileWriter != null) {
+                                    executor.getLogger().currentFileWriter.close();
+                                }
+                                executor.getLogger().currentFileWriter = null;
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            });
+            
+        } else {
+            if (options.performConnectionTest()) {
+                try {
+                    executorFactory.getDBMSExecutor(options.getDatabasePrefix() + "connectiontest", new Randomly())
+                    .testConnection();
+                } catch (Exception e) {
+                    System.err.println(
+                            "SQLancer failed creating a test database, indicating that SQLancer might have failed connecting to the DBMS. In order to change the username, password, host and port, you can use the --username, --password, --host and --port options.\n\n");
+                    e.printStackTrace();
+                    return options.getErrorExitCode();
+                }
+            }
+            
+            for (int i = 0; i < options.getTotalNumberTries(); i++) {
+                final String databaseName = options.getDatabasePrefix() + i;
+                final long seed;
+                if (options.getRandomSeed() == -1) {
+                    seed = System.currentTimeMillis() + i;
+                } else {
+                    seed = options.getRandomSeed() + i;
+                }
+                execService.execute(new Runnable() {
+                    
+                    @Override
+                    public void run() {
+                        Thread.currentThread().setName(databaseName);
+                        runThread(databaseName);
+                    }
+                    
+                    private void runThread(final String databaseName) {
+                        Randomly r = new Randomly(seed);
+                        try {
+                            int maxNrDbs = options.getMaxGeneratedDatabases();
+                            // run without a limit if maxNrDbs == -1
+                            for (int i = 0; i < maxNrDbs || maxNrDbs == -1; i++) {
+                                Boolean continueRunning = run(options, execService, executorFactory, r, databaseName);
+                                if (!continueRunning) {
+                                    someOneFails.set(true);
+                                    break;
+                                }
+                            }
+                        } finally {
+                            threadsShutdown.addAndGet(1);
+                            if (threadsShutdown.get() == options.getTotalNumberTries()) {
+                                execService.shutdown();
+                            }
+                        }
+                    }
+                    
+                    private boolean run(MainOptions options, ExecutorService execService,
+                            DBMSExecutorFactory<?, ?, ?> executorFactory, Randomly r, final String databaseName) {  
+                        DBMSExecutor<?, ?, ?> executor = executorFactory.getDBMSExecutor(databaseName, r);
+                        try {
+                            executor.run();
+                            return true;
+                        } catch (IgnoreMeException e) {
+                            return true;
+                        } catch (Throwable reduce) {
+                            reduce.printStackTrace();
+                            executor.getStateToReproduce().exception = reduce.getMessage();
+                            executor.getLogger().logFileWriter = null;
+                            executor.getLogger().logException(reduce, executor.getStateToReproduce());
+                            return false;
+                        } finally {
+                            try {
+                                if (options.logEachSelect()) {
+                                    if (executor.getLogger().currentFileWriter != null) {
+                                        executor.getLogger().currentFileWriter.close();
+                                    }
+                                    executor.getLogger().currentFileWriter = null;
+                                }
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                });
+            }
         }
         try {
         	if (options.getTimeoutSeconds() == -1) {
